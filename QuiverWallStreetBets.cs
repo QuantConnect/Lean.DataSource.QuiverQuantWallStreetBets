@@ -31,6 +31,11 @@ namespace QuantConnect.DataSource
     public class QuiverWallStreetBets : BaseData
     {
         /// <summary>
+        /// Data source ID
+        /// </summary>
+        public static int DataSourceId { get; } = 2009;
+
+        /// <summary>
         /// Date of the daily discussion thread
         /// </summary>
         [ProtoMember(10)]
