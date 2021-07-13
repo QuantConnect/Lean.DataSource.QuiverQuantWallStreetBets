@@ -82,6 +82,7 @@ namespace QuantConnect.DataProcessing
         public bool Run()
         {
             var stopwatch = Stopwatch.StartNew();
+            var today = DateTime.UtcNow.Date;
 
             try
             {
@@ -99,6 +100,12 @@ namespace QuantConnect.DataProcessing
 
                 foreach (var wsbMention in wsbMentions)
                 {
+                    if (wsbMention.Date.Date == today)
+                    {
+                        Log.Trace($"Encountered data from today: {today:yyyy-MM-dd} - Skipping");
+                        continue;
+                    }
+
                     List<RawQuiverWallStreetBets> wsbTickerMentions;
                     if (!wsbMentionsByTicker.TryGetValue(wsbMention.Ticker, out wsbTickerMentions)) 
                     {
