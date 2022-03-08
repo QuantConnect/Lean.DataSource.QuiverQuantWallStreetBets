@@ -1,0 +1,1 @@
+Get latest maps files from [US Equity Security Master](https://www.quantconnect.com/datasets/quantconnect-us-equity-security-master) and save on this directory.
