@@ -165,20 +165,11 @@ namespace QuantConnect.DataProcessing
                                         var rank = wallstreetbetsDataPoint.Rank;
                                         var sentiment = wallstreetbetsDataPoint.Sentiment;
 
-                                        csvContents.Add(string.Join(",",
-                                            $"{date}",
-                                            $"{mentions}",
-                                            $"{rank}",
-                                            $"{sentiment}"));
+                                        csvContents.Add($"{date},{mentions},{rank},{sentiment}");
                                         
                                         var sid = SecurityIdentifier.GenerateEquity(ticker, Market.USA, true, mapFileProvider, dateTime);
 
-                                        var universeCsvContents = string.Join(",",
-                                            $"{sid}",
-                                            $"{ticker}",
-                                            $"{mentions}",
-                                            $"{rank}",
-                                            $"{sentiment}");
+                                        var universeCsvContents = $"{sid},{ticker},{mentions},{rank},{sentiment}";
 
                                         ConcurrentQueue<string> tempList;
 
