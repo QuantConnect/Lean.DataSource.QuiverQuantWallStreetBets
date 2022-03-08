@@ -73,7 +73,7 @@ namespace QuantConnect.DataProcessing
         /// <param name="apiKey">The QuiverQuant API key</param>
         public QuiverWallStreetBetsDataDownloader(string destinationFolder, string apiKey = null)
         {
-            _destinationFolder = Path.Combine(destinationFolder, VendorDataName);
+            _destinationFolder = Path.Combine(destinationFolder, "alternative", VendorName, VendorDataName);
             _universeFolder = Path.Combine(_destinationFolder, "universe");
             _clientKey = apiKey ?? Config.Get("quiver-auth-token");
 
