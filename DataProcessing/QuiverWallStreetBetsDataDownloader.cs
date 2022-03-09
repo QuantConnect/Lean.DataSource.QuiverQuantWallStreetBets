@@ -13,15 +13,6 @@
  * limitations under the License.
 */
 
-using Newtonsoft.Json;
-using QuantConnect;
-using QuantConnect.Configuration;
-using QuantConnect.Data.Auxiliary;
-using QuantConnect.DataSource;
-using QuantConnect.Lean.Engine.DataFeeds;
-using QuantConnect.Logging;
-using QuantConnect.Orders;
-using QuantConnect.Util;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -34,6 +25,13 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
+using QuantConnect.Configuration;
+using QuantConnect.Data.Auxiliary;
+using QuantConnect.DataSource;
+using QuantConnect.Lean.Engine.DataFeeds;
+using QuantConnect.Logging;
+using QuantConnect.Util;
 
 namespace QuantConnect.DataProcessing
 {
@@ -48,15 +46,17 @@ namespace QuantConnect.DataProcessing
         private readonly string _destinationFolder;
         private readonly string _universeFolder;
         private readonly string _clientKey;
+        private readonly string _dataFolder = Config.Get("data-folder", Globals.DataFolder);
+        private readonly bool _canCreateUniverseFiles;
         private readonly int _maxRetries = 5;
-        private static readonly List<char> _defunctDelimiters = new List<char>
+        private static readonly List<char> _defunctDelimiters = new()
         {
             '-',
             '_'
         };
-        private ConcurrentDictionary<string, ConcurrentQueue<string>> _tempData = new ConcurrentDictionary<string, ConcurrentQueue<string>>();
+        private ConcurrentDictionary<string, ConcurrentQueue<string>> _tempData = new();
         
-        private readonly JsonSerializerSettings _jsonSerializerSettings = new JsonSerializerSettings
+        private readonly JsonSerializerSettings _jsonSerializerSettings = new()
         {
             DateTimeZoneHandling = DateTimeZoneHandling.Utc
         };
@@ -76,11 +76,13 @@ namespace QuantConnect.DataProcessing
             _destinationFolder = Path.Combine(destinationFolder, "alternative", VendorName, VendorDataName);
             _universeFolder = Path.Combine(_destinationFolder, "universe");
             _clientKey = apiKey ?? Config.Get("quiver-auth-token");
+            _canCreateUniverseFiles = Directory.Exists(Path.Combine(_dataFolder, "equity", "usa", "map_files"));
 
             // Represents rate limits of 10 requests per 1.1 second
             _indexGate = new RateGate(10, TimeSpan.FromSeconds(1.1));
 
             Directory.CreateDirectory(_destinationFolder);
+            Directory.CreateDirectory(_universeFolder);
         }
 
         /// <summary>
@@ -116,9 +118,8 @@ namespace QuantConnect.DataProcessing
                     // we don't convert tickers with `-`s into the format we can successfully
                     // index mapfiles with.
                     var quiverTicker = company.Ticker;
-                    string ticker;
 
-                    if (!TryNormalizeDefunctTicker(quiverTicker, out ticker))
+                    if (!TryNormalizeDefunctTicker(quiverTicker, out var ticker))
                     {
                         Log.Error(
                             $"QuiverWallStreetBetsDataDownloader(): Defunct ticker {quiverTicker} is unable to be parsed. Continuing...");
@@ -160,22 +161,23 @@ namespace QuantConnect.DataProcessing
                                     foreach (var wallstreetbetsDataPoint in wallstreetbetsData)
                                     {
                                         var dateTime = wallstreetbetsDataPoint.Date;
-                                        var date = dateTime.ToString("yyyyMMdd", DateTimeFormatInfo.InvariantInfo);
+                                        var date = $"{dateTime:yyyyMMdd}";
                                         var mentions = wallstreetbetsDataPoint.Mentions;
                                         var rank = wallstreetbetsDataPoint.Rank;
                                         var sentiment = wallstreetbetsDataPoint.Sentiment;
 
                                         csvContents.Add($"{date},{mentions},{rank},{sentiment}");
                                         
+                                        if (!_canCreateUniverseFiles)
+                                            continue;
+                                        
                                         var sid = SecurityIdentifier.GenerateEquity(ticker, Market.USA, true, mapFileProvider, dateTime);
 
                                         var universeCsvContents = $"{sid},{ticker},{mentions},{rank},{sentiment}";
 
-                                        ConcurrentQueue<string> tempList;
-
                                         _tempData.GetOrAdd(date, new ConcurrentQueue<string>());
-                                        
-                                        if (_tempData.TryGetValue(date, out tempList))
+
+                                        if (_tempData.TryGetValue(date, out var tempList))
                                         {
                                             tempList.Enqueue(universeCsvContents);
                                         }
@@ -318,7 +320,6 @@ namespace QuantConnect.DataProcessing
         private void SaveContentToFile(string destinationFolder, string name, IEnumerable<string> contents)
         {
             name = name.ToLowerInvariant();
-            Directory.CreateDirectory(destinationFolder);
             var bkPath = Path.Combine(destinationFolder, $"{name}-bk.csv");
             var finalPath = Path.Combine(destinationFolder, $"{name}.csv");
             var finalFileExists = File.Exists(finalPath);

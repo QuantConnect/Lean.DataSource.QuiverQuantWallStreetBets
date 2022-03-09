@@ -16,7 +16,6 @@
 using System;
 using System.IO;
 using QuantConnect.Configuration;
-using QuantConnect.DataSource;
 using QuantConnect.Logging;
 using QuantConnect.Util;
 
