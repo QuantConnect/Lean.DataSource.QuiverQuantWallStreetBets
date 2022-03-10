@@ -101,9 +101,7 @@ namespace QuantConnect.DataProcessing
             {
                 var companies = GetCompanies().Result.DistinctBy(x => x.Ticker).ToList();
                 var count = companies.Count;
-                var currentPercent = 0.05;
-                var percent = 0.05;
-                var i = 0;
+                var companiesCompleted = 0;
 
                 Log.Trace(
                     $"QuiverWallStreetBetsDataDownloader.Run(): Start processing {count.ToStringInvariant()} companies");
@@ -112,11 +110,6 @@ namespace QuantConnect.DataProcessing
 
                 foreach (var company in companies)
                 {
-                    // Include tickers that are "defunct".
-                    // Remove the tag because it cannot be part of the API endpoint.
-                    // This is separate from the NormalizeTicker(...) method since
-                    // we don't convert tickers with `-`s into the format we can successfully
-                    // index mapfiles with.
                     var quiverTicker = company.Ticker;
 
                     if (!TryNormalizeDefunctTicker(quiverTicker, out var ticker))
@@ -129,16 +122,11 @@ namespace QuantConnect.DataProcessing
                     // Begin processing ticker with a normalized value
                     Log.Trace($"QuiverWallStreetBetsDataDownloader.Run(): Processing {ticker}");
 
-                    // Makes sure we don't overrun Quiver rate limits accidentally
-                    _indexGate.WaitToProceed();
-
                     tasks.Add(
                         HttpRequester($"historical/{VendorDataName}/{ticker}")
                             .ContinueWith(
                                 y =>
                                 {
-                                    i++;
-
                                     if (y.IsFaulted)
                                     {
                                         Log.Error(
@@ -176,12 +164,7 @@ namespace QuantConnect.DataProcessing
                                         var universeCsvContents = $"{sid},{ticker},{mentions},{rank},{sentiment}";
 
                                         _tempData.GetOrAdd(date, new ConcurrentQueue<string>());
-
-                                        if (_tempData.TryGetValue(date, out var tempList))
-                                        {
-                                            tempList.Enqueue(universeCsvContents);
-                                        }
-                                        _tempData.TryUpdate(date, tempList, _tempData[date]);
+                                        _tempData[date].Enqueue(universeCsvContents);
                                     }
 
                                     if (csvContents.Count != 0)
@@ -189,12 +172,11 @@ namespace QuantConnect.DataProcessing
                                         SaveContentToFile(_destinationFolder, ticker, csvContents);
                                     }
 
-                                    var percentageDone = i / count;
-                                    if (percentageDone >= currentPercent)
+                                    var newCompaniesCompleted = Interlocked.Increment(ref companiesCompleted);
+                                    if (newCompaniesCompleted % 100 == 0)
                                     {
                                         Log.Trace(
-                                            $"QuiverWallStreetBetsDataDownloader.Run(): {percentageDone.ToStringInvariant("P2")} complete");
-                                        currentPercent += percent;
+                                            $"QuiverWallStreetBetsDataDownloader.Run(): {newCompaniesCompleted}/{count} complete");
                                     }
                                 }
                             )
@@ -278,6 +260,10 @@ namespace QuantConnect.DataProcessing
 
                         // Responses are in JSON: you need to specify the HTTP header Accept: application/json
                         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                        
+                        // Makes sure we don't overrun Quiver rate limits accidentally
+                        _indexGate.WaitToProceed();
+
                         var response = await client.GetAsync(Uri.EscapeUriString(url));
                         if (response.StatusCode == HttpStatusCode.NotFound)
                         {
@@ -290,7 +276,6 @@ namespace QuantConnect.DataProcessing
                         {
                             var finalRequestUri = response.RequestMessage.RequestUri; // contains the final location after following the redirect.
                             response = client.GetAsync(finalRequestUri).Result; // Reissue the request. The DefaultRequestHeaders configured on the client will be used, so we don't have to set them again.
-
                         }
 
                         response.EnsureSuccessStatusCode();
@@ -320,7 +305,6 @@ namespace QuantConnect.DataProcessing
         private void SaveContentToFile(string destinationFolder, string name, IEnumerable<string> contents)
         {
             name = name.ToLowerInvariant();
-            var bkPath = Path.Combine(destinationFolder, $"{name}-bk.csv");
             var finalPath = Path.Combine(destinationFolder, $"{name}.csv");
             var finalFileExists = File.Exists(finalPath);
 
@@ -344,9 +328,7 @@ namespace QuantConnect.DataProcessing
             var tempFilePath = new FileInfo(tempPath);
             if (finalFileExists)
             {
-                tempFilePath.Replace(finalPath, bkPath);
-                var bkFilePath = new FileInfo(bkPath);
-                bkFilePath.Delete();
+                tempFilePath.Replace(finalPath, null);
             }
             else
             {
@@ -385,22 +367,6 @@ namespace QuantConnect.DataProcessing
 
             nonDefunctTicker = ticker;
             return true;
-        }
-
-
-        /// <summary>
-        /// Normalizes Estimize tickers to a format usable by the <see cref="Data.Auxiliary.MapFileResolver"/>
-        /// </summary>
-        /// <param name="ticker">Ticker to normalize</param>
-        /// <returns>Normalized ticker</returns>
-        private static string NormalizeTicker(string ticker)
-        {
-            return ticker.ToLowerInvariant()
-                .Replace("- defunct", string.Empty)
-                .Replace("-defunct", string.Empty)
-                .Replace(" ", string.Empty)
-                .Replace("|", string.Empty)
-                .Replace("-", ".");
         }
 
         private class Company
