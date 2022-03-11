@@ -13,12 +13,8 @@
  * limitations under the License.
 */
 
-using Newtonsoft.Json;
-using QuantConnect.Configuration;
-using QuantConnect.DataSource;
-using QuantConnect.Logging;
-using QuantConnect.Util;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
@@ -29,6 +25,13 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json;
+using QuantConnect.Configuration;
+using QuantConnect.Data.Auxiliary;
+using QuantConnect.DataSource;
+using QuantConnect.Lean.Engine.DataFeeds;
+using QuantConnect.Logging;
+using QuantConnect.Util;
 
 namespace QuantConnect.DataProcessing
 {
@@ -41,15 +44,19 @@ namespace QuantConnect.DataProcessing
         public const string VendorDataName = "wallstreetbets";
         
         private readonly string _destinationFolder;
+        private readonly string _universeFolder;
         private readonly string _clientKey;
+        private readonly string _dataFolder = Globals.DataFolder;
+        private readonly bool _canCreateUniverseFiles;
         private readonly int _maxRetries = 5;
-        private static readonly List<char> _defunctDelimiters = new List<char>
+        private static readonly List<char> _defunctDelimiters = new()
         {
             '-',
             '_'
         };
+        private ConcurrentDictionary<string, ConcurrentQueue<string>> _tempData = new();
         
-        private readonly JsonSerializerSettings _jsonSerializerSettings = new JsonSerializerSettings
+        private readonly JsonSerializerSettings _jsonSerializerSettings = new()
         {
             DateTimeZoneHandling = DateTimeZoneHandling.Utc
         };
@@ -62,17 +69,20 @@ namespace QuantConnect.DataProcessing
         /// <summary>
         /// Creates a new instance of <see cref="QuiverWallStreetBets"/>
         /// </summary>
-        /// <param name="destinationDataFolder">The data folder where the data will be saved</param>
+        /// <param name="destinationFolder">The folder where the data will be saved</param>
         /// <param name="apiKey">The QuiverQuant API key</param>
-        public QuiverWallStreetBetsDataDownloader(string destinationDataFolder, string apiKey = null)
+        public QuiverWallStreetBetsDataDownloader(string destinationFolder, string apiKey = null)
         {
-            _destinationFolder = Path.Combine(destinationDataFolder, "alternative", VendorName, VendorDataName);
+            _destinationFolder = Path.Combine(destinationFolder, "alternative", VendorName, VendorDataName);
+            _universeFolder = Path.Combine(_destinationFolder, "universe");
             _clientKey = apiKey ?? Config.Get("quiver-auth-token");
+            _canCreateUniverseFiles = Directory.Exists(Path.Combine(_dataFolder, "equity", "usa", "map_files"));
 
             // Represents rate limits of 10 requests per 1.1 second
             _indexGate = new RateGate(10, TimeSpan.FromSeconds(1.1));
 
             Directory.CreateDirectory(_destinationFolder);
+            Directory.CreateDirectory(_universeFolder);
         }
 
         /// <summary>
@@ -84,56 +94,119 @@ namespace QuantConnect.DataProcessing
             var stopwatch = Stopwatch.StartNew();
             var today = DateTime.UtcNow.Date;
 
+            var mapFileProvider = new LocalZipMapFileProvider();
+            mapFileProvider.Initialize(new DefaultDataProvider());
+
             try
             {
-                Log.Trace($"QuiverWallStreetBetsDataDownloader.Run(): Start downloading/processing QuiverQuant WallStreetBets data");
+                var companies = GetCompanies().Result.DistinctBy(x => x.Ticker).ToList();
+                var count = companies.Count;
+                var companiesCompleted = 0;
 
-                var quiverWsbData = HttpRequester($"historical/wallstreetbets").SynchronouslyAwaitTaskResult();
-                if (string.IsNullOrWhiteSpace(quiverWsbData))
+                Log.Trace(
+                    $"QuiverWallStreetBetsDataDownloader.Run(): Start processing {count.ToStringInvariant()} companies");
+
+                var tasks = new List<Task>();
+
+                foreach (var company in companies)
                 {
-                    // We've already logged inside HttpRequester
-                    return false;
-                }
+                    var quiverTicker = company.Ticker;
 
-                var wsbMentionsByTicker = new Dictionary<string, List<RawQuiverWallStreetBets>>();
-                var wsbMentions = JsonConvert.DeserializeObject<List<RawQuiverWallStreetBets>>(quiverWsbData, _jsonSerializerSettings);
-
-                foreach (var wsbMention in wsbMentions)
-                {
-                    if (wsbMention.Date.Date == today)
+                    if (!TryNormalizeDefunctTicker(quiverTicker, out var ticker))
                     {
-                        Log.Trace($"Encountered data from today: {today:yyyy-MM-dd} - Skipping");
+                        Log.Error(
+                            $"QuiverWallStreetBetsDataDownloader(): Defunct ticker {quiverTicker} is unable to be parsed. Continuing...");
                         continue;
                     }
 
-                    List<RawQuiverWallStreetBets> wsbTickerMentions;
-                    if (!wsbMentionsByTicker.TryGetValue(wsbMention.Ticker, out wsbTickerMentions)) 
-                    {
-                        wsbTickerMentions = new List<RawQuiverWallStreetBets>();
-                        wsbMentionsByTicker[wsbMention.Ticker] = wsbTickerMentions;
-                    }
+                    // Begin processing ticker with a normalized value
+                    Log.Trace($"QuiverWallStreetBetsDataDownloader.Run(): Processing {ticker}");
 
-                    wsbTickerMentions.Add(wsbMention);
+                    tasks.Add(
+                        HttpRequester($"historical/{VendorDataName}/{ticker}")
+                            .ContinueWith(
+                                y =>
+                                {
+                                    if (y.IsFaulted)
+                                    {
+                                        Log.Error(
+                                            $"QuiverWallStreetBetsDataDownloader.Run(): Failed to get data for {company}");
+                                        return;
+                                    }
+
+                                    var result = y.Result;
+                                    if (string.IsNullOrEmpty(result))
+                                    {
+                                        // We've already logged inside HttpRequester
+                                        return;
+                                    }
+
+                                    var wallstreetbetsData =
+                                        JsonConvert.DeserializeObject<List<QuiverWallStreetBets>>(result,
+                                            _jsonSerializerSettings);
+                                    var csvContents = new List<string>();
+
+                                    foreach (var wallstreetbetsDataPoint in wallstreetbetsData)
+                                    {
+                                        var dateTime = wallstreetbetsDataPoint.Date;
+                                        var date = $"{dateTime:yyyyMMdd}";
+                                        var mentions = wallstreetbetsDataPoint.Mentions;
+                                        var rank = wallstreetbetsDataPoint.Rank;
+                                        var sentiment = wallstreetbetsDataPoint.Sentiment;
+
+                                        csvContents.Add($"{date},{mentions},{rank},{sentiment}");
+                                        
+                                        if (!_canCreateUniverseFiles)
+                                            continue;
+                                        
+                                        var sid = SecurityIdentifier.GenerateEquity(ticker, Market.USA, true, mapFileProvider, dateTime);
+
+                                        var universeCsvContents = $"{sid},{ticker},{mentions},{rank},{sentiment}";
+
+                                        var queue = _tempData.GetOrAdd(date, new ConcurrentQueue<string>()); 
+                                        queue.Enqueue(universeCsvContents);
+                                    }
+
+                                    if (csvContents.Count != 0)
+                                    {
+                                        SaveContentToFile(_destinationFolder, ticker, csvContents);
+                                    }
+
+                                    var newCompaniesCompleted = Interlocked.Increment(ref companiesCompleted);
+                                    if (newCompaniesCompleted % 100 == 0)
+                                    {
+                                        Log.Trace(
+                                            $"QuiverWallStreetBetsDataDownloader.Run(): {newCompaniesCompleted}/{count} complete");
+                                    }
+                                }
+                            )
+                    );
+
+                    if (tasks.Count == 10)
+                    {
+                        Task.WaitAll(tasks.ToArray());
+
+                        foreach (var kvp in _tempData)
+                        {
+                            SaveContentToFile(_universeFolder, kvp.Key, kvp.Value);
+                        }
+
+                        _tempData.Clear();
+                        tasks.Clear();
+                    }
                 }
 
-                foreach (var kvp in wsbMentionsByTicker) 
+                if (tasks.Count != 0)
                 {
-                    var ticker = kvp.Key.ToUpperInvariant();
-                    var csvContents = new List<string>();
+                    Task.WaitAll(tasks.ToArray());
                     
-                    foreach (var wsbMention in kvp.Value.OrderBy(x => x.Date)) 
+                    foreach (var kvp in _tempData)
                     {
-                        csvContents.Add(string.Join(",", 
-                            $"{wsbMention.Date:yyyyMMdd}",
-                            $"{wsbMention.Mentions}",
-                            $"{wsbMention.Rank}",
-                            $"{wsbMention.Sentiment}"));
+                        SaveContentToFile(_universeFolder, kvp.Key, kvp.Value);
                     }
 
-                    if (csvContents.Count != 0)
-                    {
-                        SaveContentToFile(_destinationFolder, ticker, csvContents);
-                    }
+                    _tempData.Clear();
+                    tasks.Clear();
                 }
             }
             catch (Exception e)
@@ -144,6 +217,24 @@ namespace QuantConnect.DataProcessing
 
             Log.Trace($"QuiverWallStreetBetsDataDownloader.Run(): Finished in {stopwatch.Elapsed.ToStringInvariant(null)}");
             return true;
+        }
+
+        /// <summary>
+        /// Gets the list of companies
+        /// </summary>
+        /// <returns>List of companies</returns>
+        /// <exception cref="Exception"></exception>
+        private async Task<List<Company>> GetCompanies()
+        {
+            try
+            {
+                var content = await HttpRequester("companies");
+                return JsonConvert.DeserializeObject<List<Company>>(content);
+            }
+            catch (Exception e)
+            {
+                throw new Exception("QuiverDownloader.GetSymbols(): Error parsing companies list", e);
+            }
         }
 
         /// <summary>
@@ -169,6 +260,10 @@ namespace QuantConnect.DataProcessing
 
                         // Responses are in JSON: you need to specify the HTTP header Accept: application/json
                         client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                        
+                        // Makes sure we don't overrun Quiver rate limits accidentally
+                        _indexGate.WaitToProceed();
+
                         var response = await client.GetAsync(Uri.EscapeUriString(url));
                         if (response.StatusCode == HttpStatusCode.NotFound)
                         {
@@ -181,7 +276,6 @@ namespace QuantConnect.DataProcessing
                         {
                             var finalRequestUri = response.RequestMessage.RequestUri; // contains the final location after following the redirect.
                             response = client.GetAsync(finalRequestUri).Result; // Reissue the request. The DefaultRequestHeaders configured on the client will be used, so we don't have to set them again.
-
                         }
 
                         response.EnsureSuccessStatusCode();
@@ -206,46 +300,33 @@ namespace QuantConnect.DataProcessing
         /// Saves contents to disk, deleting existing zip files
         /// </summary>
         /// <param name="destinationFolder">Final destination of the data</param>
-        /// <param name="ticker">Stock ticker</param>
+        /// <param name="name">file name</param>
         /// <param name="contents">Contents to write</param>
-        private void SaveContentToFile(string destinationFolder, string ticker, IEnumerable<string> contents)
+        private void SaveContentToFile(string destinationFolder, string name, IEnumerable<string> contents)
         {
-            ticker = ticker.ToLowerInvariant();
-            var bkPath = Path.Combine(destinationFolder, $"{ticker}-bk.csv");
-            var finalPath = Path.Combine(destinationFolder, $"{ticker}.csv");
+            name = name.ToLowerInvariant();
+            var finalPath = Path.Combine(destinationFolder, $"{name}.csv");
             var finalFileExists = File.Exists(finalPath);
 
             var lines = new HashSet<string>(contents);
             if (finalFileExists)
             {
-                Log.Trace($"QuiverWallStreetBetsDataDownloader.SaveContentToFile(): Adding to existing file: {finalPath}");
                 foreach (var line in File.ReadAllLines(finalPath))
                 {
                     lines.Add(line);
                 }
             }
-            else
-            {
-                Log.Trace($"QuiverWallStreetBetsDataDownloader.SaveContentToFile(): Writing to file: {finalPath}");
-            }
 
-            var finalLines = lines
+            var finalLines = destinationFolder.Contains("universe") ? 
+                lines.OrderBy(x => x.Split(',').First()).ToList() :
+                lines
                 .OrderBy(x => DateTime.ParseExact(x.Split(',').First(), "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal))
                 .ToList();
 
             var tempPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.tmp");
             File.WriteAllLines(tempPath, finalLines);
             var tempFilePath = new FileInfo(tempPath);
-            if (finalFileExists)
-            {
-                tempFilePath.Replace(finalPath,bkPath);
-                var bkFilePath = new FileInfo(bkPath);
-                bkFilePath.Delete();
-            }
-            else
-            {
-                tempFilePath.MoveTo(finalPath);
-            }
+            tempFilePath.MoveTo(finalPath, true);
         }
 
         /// <summary>
@@ -281,24 +362,17 @@ namespace QuantConnect.DataProcessing
             return true;
         }
 
-
-        /// <summary>
-        /// Normalizes Estimize tickers to a format usable by the <see cref="Data.Auxiliary.MapFileResolver"/>
-        /// </summary>
-        /// <param name="ticker">Ticker to normalize</param>
-        /// <returns>Normalized ticker</returns>
-        private static string NormalizeTicker(string ticker)
+        private class Company
         {
-            return ticker.ToLowerInvariant()
-                .Replace("- defunct", string.Empty)
-                .Replace("-defunct", string.Empty)
-                .Replace(" ", string.Empty)
-                .Replace("|", string.Empty)
-                .Replace("-", ".");
-        }
+            /// <summary>
+            /// The name of the company
+            /// </summary>
+            [JsonProperty(PropertyName = "Name")]
+            public string Name { get; set; }
 
-        private class RawQuiverWallStreetBets : QuiverWallStreetBets 
-        {
+            /// <summary>
+            /// The ticker/symbol for the company
+            /// </summary>
             [JsonProperty(PropertyName = "Ticker")]
             public string Ticker { get; set; }
         }
