@@ -49,14 +49,14 @@ namespace QuantConnect.DataSource
         [ProtoMember(11)]
         [JsonProperty(PropertyName = "Mentions")]
         public int Mentions { get; set; }
-        
+
         /// <summary>
         /// This ticker's rank on the given date (as determined by total number of mentions)
         /// </summary>
         [ProtoMember(12)]
         [JsonProperty(PropertyName = "Rank")]
         public int Rank { get; set; }
-        
+
         /// <summary>
         /// Average sentiment of all comments containing the given ticker on this date. Sentiment is calculated using VADER sentiment analysis.
         /// The value can range between -1 and +1. Negative values imply negative sentiment, whereas positive values imply positive sentiment.
@@ -99,7 +99,7 @@ namespace QuantConnect.DataSource
             Mentions = Parse.Int(csv[1]);
             Rank = Parse.Int(csv[2]);
             Sentiment = Parse.Decimal(csv[3]);
-            
+
             Time = Date;
             Period = TimeSpan.FromDays(1);
         }
@@ -150,7 +150,6 @@ namespace QuantConnect.DataSource
                 Invariant($"WallStreetBets Mentions: {Mentions} ") +
                 Invariant($"WallStreetBets Rank: {Rank} ") +
                 Invariant($"WallStreetBets Sentiment: {Sentiment}");
-
         }
 
         /// <summary>

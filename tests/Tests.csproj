@@ -4,10 +4,10 @@
     <RootNamespace>QuantConnect.DataLibrary.Tests</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="..\Demonstration.cs" Link="Demonstration.cs" />
-    <Compile Include="..\DemonstrationUniverse.cs" Link="DemonstrationUniverse.cs" />
     <Compile Include="..\QuiverWallStreetBetsDataAlgorithm.cs" Link="QuiverWallStreetBetsDataAlgorithm.cs" />
-    <Content Include="..\QuiverWallStreetBetsDataAlgorithm.py" Link="QuiverWallStreetBetsDataAlgorithm.py" />
+    <Compile Include="..\QuiverWallStreetBetsUniverseSelectionAlgorithm.cs" Link="QuiverWallStreetBetsUniverseSelectionAlgorithm.cs" />
+    <None Include="..\QuiverWallStreetBetsDataAlgorithm.py" Link="QuiverWallStreetBetsDataAlgorithm.py" />
+    <None Include="..\QuiverWallStreetBetsUniverseSelectionAlgorithm.py" Link="QuiverWallStreetBetsUniverseSelectionAlgorithm.py" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="protobuf-net" Version="3.0.29" />

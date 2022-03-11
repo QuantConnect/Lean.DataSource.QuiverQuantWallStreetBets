@@ -29,18 +29,18 @@ namespace QuantConnect.Algorithm.CSharp
             // Data ADDED via universe selection is added with Daily resolution.
             UniverseSettings.Resolution = Resolution.Daily;
 
-	        SetStartDate(2022, 2, 14);
+            SetStartDate(2022, 2, 14);
             SetEndDate(2022, 2, 18);
             SetCash(100000);
 
             // add a custom universe data source (defaults to usa-equity)
             AddUniverse<QuiverWallStreetBetsUniverse>("QuiverWallStreetBetsUniverse", Resolution.Daily, data =>
             {
-            	foreach (var datum in data)
-            	{
-            		Log($"{datum.Symbol},{datum.Mentions},{datum.Rank},{datum.Sentiment}");
-            	}
-            	
+                foreach (var datum in data)
+                {
+                    Log($"{datum.Symbol},{datum.Mentions},{datum.Rank},{datum.Sentiment}");
+                }
+
                 // define our selection criteria
                 return from d in data
                        where d.Mentions > 10 && d.Rank > 10
@@ -50,7 +50,7 @@ namespace QuantConnect.Algorithm.CSharp
         
         public override void OnSecuritiesChanged(SecurityChanges changes)
         {
-        	Log(changes.ToString());
+            Log(changes.ToString());
         }
     }
 }

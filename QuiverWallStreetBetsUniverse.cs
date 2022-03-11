@@ -42,7 +42,7 @@ namespace QuantConnect.DataSource
         [ProtoMember(11)]
         [JsonProperty(PropertyName = "Mentions")]
         public int Mentions { get; set; }
-        
+
         /// <summary>
         /// This ticker's rank on the given date (as determined by total number of mentions)
         /// </summary>
@@ -62,15 +62,20 @@ namespace QuantConnect.DataSource
         /// The period of time that occurs between the starting time and ending time of the data point
         /// </summary>
         [ProtoMember(14)]
-        public TimeSpan Period { get; set; }
+        public TimeSpan Period { get; set; } = TimeSpan.FromDays(1);
 
-        public override DateTime EndTime
-        {
-            // define end time as exactly 1 day after Time
-            get { return Time + QuantConnect.Time.OneDay; }
-            set { Time = value - QuantConnect.Time.OneDay; }
-        }
+        /// <summary>
+        /// The time the data point ends at and becomes available to the algorithm
+        /// </summary>
+        public override DateTime EndTime => Time + Period;
         
+        /// <summary>
+        /// Return the URL string source of the file. This will be converted to a stream
+        /// </summary>
+        /// <param name="config">Configuration object</param>
+        /// <param name="date">Date of this source file</param>
+        /// <param name="isLiveMode">true if we're in live mode, false for backtesting mode</param>
+        /// <returns>String URL of source file.</returns>
         public override SubscriptionDataSource GetSource(SubscriptionDataConfig config, DateTime date, bool isLiveMode)
         {
             return new SubscriptionDataSource(
@@ -86,18 +91,28 @@ namespace QuantConnect.DataSource
             );
         }
 
+        /// <summary>
+        /// Parses the data from the line provided and loads it into LEAN
+        /// </summary>
+        /// <param name="config">Subscription configuration</param>
+        /// <param name="line">Line of data</param>
+        /// <param name="date">Date</param>
+        /// <param name="isLiveMode">Is live mode</param>
+        /// <returns>New instance</returns>
         public override BaseData Reader(SubscriptionDataConfig config, string line, DateTime date, bool isLiveMode)
         {
             var csv = line.Split(',');
+            var mentions = Parse.Int(csv[2]);
 
             return new QuiverWallStreetBetsUniverse
             {
-                Mentions = Parse.Int(csv[2]),
+                Mentions = mentions,
                 Rank = Parse.Int(csv[3]),
                 Sentiment = decimal.Parse(csv[4], NumberStyles.Any, CultureInfo.InvariantCulture),
 
                 Symbol = new Symbol(SecurityIdentifier.Parse(csv[0]), csv[1]),
-                Time = date.AddDays(-1),
+                Time = date - Period,
+                Value = mentions
             };
         }
     }

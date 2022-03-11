@@ -46,7 +46,7 @@ namespace QuantConnect.DataProcessing
         private readonly string _destinationFolder;
         private readonly string _universeFolder;
         private readonly string _clientKey;
-        private readonly string _dataFolder = Config.Get("data-folder", Globals.DataFolder);
+        private readonly string _dataFolder = Globals.DataFolder;
         private readonly bool _canCreateUniverseFiles;
         private readonly int _maxRetries = 5;
         private static readonly List<char> _defunctDelimiters = new()
@@ -163,8 +163,8 @@ namespace QuantConnect.DataProcessing
 
                                         var universeCsvContents = $"{sid},{ticker},{mentions},{rank},{sentiment}";
 
-                                        _tempData.GetOrAdd(date, new ConcurrentQueue<string>());
-                                        _tempData[date].Enqueue(universeCsvContents);
+                                        var queue = _tempData.GetOrAdd(date, new ConcurrentQueue<string>()); 
+                                        queue.Enqueue(universeCsvContents);
                                     }
 
                                     if (csvContents.Count != 0)
@@ -326,14 +326,7 @@ namespace QuantConnect.DataProcessing
             var tempPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.tmp");
             File.WriteAllLines(tempPath, finalLines);
             var tempFilePath = new FileInfo(tempPath);
-            if (finalFileExists)
-            {
-                tempFilePath.Replace(finalPath, null);
-            }
-            else
-            {
-                tempFilePath.MoveTo(finalPath);
-            }
+            tempFilePath.MoveTo(finalPath, true);
         }
 
         /// <summary>
