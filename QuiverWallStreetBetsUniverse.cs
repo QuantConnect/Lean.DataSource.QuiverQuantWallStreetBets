@@ -68,7 +68,7 @@ namespace QuantConnect.DataSource
         /// The time the data point ends at and becomes available to the algorithm
         /// </summary>
         public override DateTime EndTime => Time + Period;
-        
+
         /// <summary>
         /// Return the URL string source of the file. This will be converted to a stream
         /// </summary>

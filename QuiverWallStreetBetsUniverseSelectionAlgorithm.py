@@ -17,7 +17,7 @@ class QuiverWallStreetBetsUniverseAlgorithm(QCAlgorithm):
     def Initialize(self):
         # Data ADDED via universe selection is added with Daily resolution.
         self.UniverseSettings.Resolution = Resolution.Daily
-        
+
         self.SetStartDate(2022, 2, 14)
         self.SetEndDate(2022, 2, 18)
         self.SetCash(100000)
