@@ -27,7 +27,7 @@ class QuiverWallStreetBetsUniverseAlgorithm(QCAlgorithm):
         
     def UniverseSelection(self, data):
         for datum in data:
-            self.Log(f"{datum.Symbol},{datum.Followers},{datum.DayPercentChange},{datum.WeekPercentChange}")
+            self.Log(f"{datum.Symbol},{datum.Mentions},{datum.Rank},{datum.Sentiment}")
         
         # define our selection criteria
         return [d.Symbol for d in data \
