@@ -215,18 +215,31 @@ namespace QuantConnect.DataProcessing
         /// <param name="contents">Contents to write</param>
         private void SaveContentToFile(string destinationFolder, string name, IEnumerable<string> contents)
         {
-            var lines = new HashSet<string>(contents).ToList();
-
-            if (!destinationFolder.Contains("universe"))
+            var finalPath = Path.Combine(destinationFolder, $"{name.ToLowerInvariant()}.csv");
+            
+            var lines = new HashSet<string>(contents);
+            if (File.Exists(finalPath))
             {
-                lines = lines
-                    .OrderBy(x => DateTime.ParseExact(x.Split(',').First(), "yyyyMMdd", CultureInfo.InvariantCulture,
-                        DateTimeStyles.AdjustToUniversal))
-                    .ToList();
+                foreach (var line in File.ReadAllLines(finalPath))
+                {
+                    lines.Add(line);
+                }
             }
 
-            File.WriteAllLines(Path.Combine(destinationFolder, $"{name.ToLowerInvariant()}.csv"), lines);
+            var finalLines = destinationFolder.Contains("universe") ?
+                lines.OrderBy(x => x) :
+                lines.OrderBy(x => DateTime.ParseExact(x.Split(',').First(), "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal));
+
+            try
+            {
+                File.WriteAllLines(finalPath, finalLines);
+            }
+            catch (Exception e)
+            {
+                Log.Error(e, $"QuiverWallStreetBetsDataDownloader.HttpRequester(): Final Path: {finalPath}");
+            }
         }
+
 
         /// <summary>
         /// Disposes of unmanaged resources
