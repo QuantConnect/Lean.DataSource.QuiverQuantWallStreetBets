@@ -13,13 +13,12 @@
  * limitations under the License.
 */
 
+using System;
+using System.IO;
 using QuantConnect.Data;
 using QuantConnect.Util;
 using Newtonsoft.Json;
-using System;
-using System.IO;
 using NodaTime;
-using ProtoBuf;
 using static QuantConnect.StringExtensions;
 
 namespace QuantConnect.DataSource
@@ -27,9 +26,10 @@ namespace QuantConnect.DataSource
     /// <summary>
     /// Mentions of the given company's ticker in the WallStreetBets daily discussion thread
     /// </summary>
-    [ProtoContract(SkipConstructor = true)]
     public class QuiverWallStreetBets : BaseData
     {
+        private static readonly TimeSpan _period = TimeSpan.FromDays(1);
+        
         /// <summary>
         /// Data source ID
         /// </summary>
@@ -38,7 +38,6 @@ namespace QuantConnect.DataSource
         /// <summary>
         /// Date of the daily discussion thread
         /// </summary>
-        [ProtoMember(10)]
         [JsonProperty(PropertyName = "Date")]
         [JsonConverter(typeof(DateTimeJsonConverter), "yyyy-MM-dd")]
         public DateTime Date { get; set; }
@@ -46,14 +45,12 @@ namespace QuantConnect.DataSource
         /// <summary>
         /// The number of mentions on the given date
         /// </summary>
-        [ProtoMember(11)]
         [JsonProperty(PropertyName = "Mentions")]
         public int Mentions { get; set; }
 
         /// <summary>
         /// This ticker's rank on the given date (as determined by total number of mentions)
         /// </summary>
-        [ProtoMember(12)]
         [JsonProperty(PropertyName = "Rank")]
         public int Rank { get; set; }
 
@@ -61,24 +58,13 @@ namespace QuantConnect.DataSource
         /// Average sentiment of all comments containing the given ticker on this date. Sentiment is calculated using VADER sentiment analysis.
         /// The value can range between -1 and +1. Negative values imply negative sentiment, whereas positive values imply positive sentiment.
         /// </summary>
-        [ProtoMember(13)]
         [JsonProperty(PropertyName = "Sentiment")]
         public decimal Sentiment { get; set; }
-        
-        /// <summary>
-        /// The period of time that occurs between the starting time and ending time of the data point
-        /// </summary>
-        [ProtoMember(14)]
-        public TimeSpan Period { get; set; }
 
         /// <summary>
         /// The time the data point ends at and becomes available to the algorithm
         /// </summary>
-        public override DateTime EndTime
-        {
-            get { return Time + Period; }
-            set { Time = value - Period; }
-        }
+        public override DateTime EndTime => Time + _period;
 
         /// <summary>
         /// Required for successful Json.NET deserialization
@@ -101,7 +87,6 @@ namespace QuantConnect.DataSource
             Sentiment = Parse.Decimal(csv[3]);
 
             Time = Date;
-            Period = TimeSpan.FromDays(1);
         }
 
         /// <summary>
