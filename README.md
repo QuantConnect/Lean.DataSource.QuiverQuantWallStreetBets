@@ -1,11 +1,9 @@
-
-![header-cheetah](https://user-images.githubusercontent.com/79997186/184224088-de4f3003-0c22-4a17-8cc7-b341b8e5b55d.png)
-
+<picture >
+  <source media="(prefers-color-scheme: dark)" srcset="https://user-images.githubusercontent.com/79997186/190704543-581838c9-4c83-43dc-9abf-aeefcd7ff0fd.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://user-images.githubusercontent.com/79997186/190704618-4b09e405-02e8-4774-8480-d896537caab2.png">
+  <img alt="Dataset Integration">
+</picture>
   
-
-&nbsp;
-
-&nbsp;
 
 &nbsp;
 
