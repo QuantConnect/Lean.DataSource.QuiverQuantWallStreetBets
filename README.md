@@ -4,10 +4,33 @@
   <img alt="Dataset Integration">
 </picture>
   
-
 &nbsp;
 
-  
+### Table of Contents
+- [Introduction](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#introduction)
+- [About](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#about)
+    - [Introduction](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#introduction-1)
+    - [About the Provider](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#about-the-provider)
+    - [Getting Started](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#getting-started)
+    - [Using the Dataset](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#using-the-dataset)
+        - [Backtesting with VSCode User Interace](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#backtesting-with-vscode-user-interface)
+        - [Backtesting with LEAN CLI](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#backtesting-with-lean-cli)
+    - [Data Summary](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#data-summary)
+    - [Example Applications](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#example-applications)
+    - [Data Point Attributes](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#data-point-attributes)
+- [Documentation](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#documentation)
+    - [Requesting Data](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#requesting-data)
+    - [Accessing Data](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#accessing-data)
+    - [Historical Data](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#historical-data)
+    - [Universe Selection](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#universe-selection)
+    - [Remove Subscriptions](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#remove-subscriptions)
+- [Lean DataSource SDK](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#lean-datasource-sdk)
+    - [Introduction](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#introduction-2)
+    - [Implementing your own data source](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#implementing-your-own-data-source)
+- [Contributions](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#contributions)
+- [Code of Conduct](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#code-of-conduct)
+- [License Model](https://github.com/QuantConnect/Lean.DataSource.QuiverQuantWallStreetBets#license-model)
+
 
 ## Introduction
  
@@ -31,13 +54,6 @@ This dataset depends on the  [US Equity Security Master](https://www.quantconnec
 
 The following snippet demonstrates how to request data from the WallStreetBets dataset:
 
-C#:
-```cs
-_symbol = AddEquity("AAPL", Resolution.Daily).Symbol;
-_datasetSymbol = AddData<QuiverWallStreetBets>(_symbol).Symbol;
-
-AddUniverse<QuiverWallStreetBetsUniverse>("QuiverWallStreetBetsUniverse", Resolution.Daily, UniverseSelection);
-```
 Python:
 ```py
 self.symbol = self.AddEquity("AAPL",  Resolution.Daily).Symbol
@@ -45,6 +61,41 @@ self.dataset_symbol = self.AddData(QuiverWallStreetBets, self.symbol).Symbol
 
 self.AddUniverse(QuiverWallStreetBetsUniverse,  "QuiverWallStreetBetsUniverse",  Resolution.Daily, self.UniverseSelection)
 ```
+C#:
+```cs
+_symbol = AddEquity("AAPL", Resolution.Daily).Symbol;
+_datasetSymbol = AddData<QuiverWallStreetBets>(_symbol).Symbol;
+
+AddUniverse<QuiverWallStreetBetsUniverse>("QuiverWallStreetBetsUniverse", Resolution.Daily, UniverseSelection);
+```
+
+### Using the Dataset
+#### Backtesting with VSCode User Interace
+
+The following video shows an example of using the dataset in QuantConnect Cloud:
+
+![wallstreetbets-cloud-demo](https://user-images.githubusercontent.com/38889814/193858736-c1c80b53-cd2c-456e-8f58-88b99048cf79.gif)
+
+
+#### Backtesting with LEAN CLI
+Follow these steps to use the dataset locally through the LEAN CLI:
+1. [Create a new project](https://www.quantconnect.com/docs/v2/lean-cli/projects/project-management#02-Create-Projects).
+   ```
+   $ lean create-project "My Project"
+   ```
+2. Edit the code files in your project so the algorithm subscribes to the data and logs it.
+
+3. If you don't have the data on your local machine, backtest the algorithm with the [ApiDataProvider](https://www.quantconnect.com/docs/v2/lean-cli/backtesting/deployment#04-Download-Datasets-During-Backtests).
+   ```
+   $ lean backtest "My Project" --download-data
+   ```
+4. If you have the data on your local machine, backtest the algorithm with the local data provider.
+   ```
+   $ lean backtest "My Project" --data-provider Local
+   ```
+   You can [use the CLI to download the data](https://www.quantconnect.com/datasets/quiver-quantitative-wallstreetbets/cli).
+
+![wallstreetbets-local-demo](https://user-images.githubusercontent.com/38889814/193858579-6ff2e076-091c-4fba-b803-d411cc1fffba.gif)
 
 ### Data Summary
 
@@ -58,18 +109,6 @@ The following table describes the dataset properties:
 |Resolution|Daily|
 |Timezone|UTC|
 
-### Meta Data
-The following table provides information for listing and data processing:
-| Property  | Value |
-| ----------- | ----------- |
-|Dataset name|WallStreetBets |
-|Vendor name|Quiver Quantitative|
-|Vendor Website|https://www.quiverquant.com/|
-|Data process time|00:00 UTC Mon, Tue, Wed, Thu, Fri|
-|Data process duration|20 minutes|
-
-Most datasets are distributed via REST API. If it's not the case, and it requires a different method (e.g.: S3 bucket), please contact support@quantconnect.com.
-
 ### Example Applications
 The WallStreetBets dataset enables you to create strategies using the latest activity on the WallStreetBets daily discussion thread. Examples include the following strategies:
 
@@ -79,16 +118,7 @@ The WallStreetBets dataset enables you to create strategies using the latest act
   
 ### Data Point Attributes
 
-The WallStreetBets dataset provides  **QuiverWallStreetBets**  and  **QuiverWallStreetBetsUniverse**  objects.
-
-#### QuiverWallStreetBets Attributes
-**QuiverWallStreetBets**  objects have the following attributes:
-<div data-tree="QuantConnect.DataSource.QuiverWallStreetBets"></div>
-
-#### QuiverWallStreetBetsUniverse Attributes
-**QuiverWallStreetBetsUniverse**  objects have the following attributes:
-<div data-tree="QuantConnect.DataSource.QuiverWallStreetBetsUniverse"></div>
-
+The WallStreetBets dataset provides  **QuiverWallStreetBets**  and  **QuiverWallStreetBetsUniverse**  objects. To view the members of these objects, see [Data Point Attributes](https://www.quantconnect.com/docs/v2/writing-algorithms/datasets/quiver-quantitative/wallstreetbets#05-Data-Point-Attributes) in the QuantConnect documentation.
 
 ## Documentation
 
@@ -96,6 +126,16 @@ The WallStreetBets dataset provides  **QuiverWallStreetBets**  and  **QuiverWall
 
 To add WallStreetBets data to your algorithm, call the **AddData** method. Save a reference to the dataset **Symbol** so you can access the data later in your algorithm.
 
+Python:
+```py
+class  QuiverWallStreetBetsDataAlgorithm(QCAlgorithm):
+    def  Initialize(self)  ->  None:
+        self.SetStartDate(2019,  1,  1)
+        self.SetEndDate(2020,  6,  1)
+        self.SetCash(100000)
+        self.symbol = self.AddEquity("AAPL",  Resolution.Daily).Symbol
+        self.dataset_symbol = self.AddData(QuiverWallStreetBets, self.symbol).Symbol
+```
 C#:
 ```cs
 namespace QuantConnect
@@ -114,21 +154,18 @@ namespace QuantConnect
     }
 }
 ```
-Python:
-```py
-class  QuiverWallStreetBetsDataAlgorithm(QCAlgorithm):
-    def  Initialize(self)  ->  None:
-        self.SetStartDate(2019,  1,  1)
-        self.SetEndDate(2020,  6,  1)
-        self.SetCash(100000)
-        self.symbol = self.AddEquity("AAPL",  Resolution.Daily).Symbol
-        self.dataset_symbol = self.AddData(QuiverWallStreetBets, self.symbol).Symbol
-```
 
 ### Accessing Data
 
 To get the current WallStreetBets data, index the current  [**Slice**](https://www.quantconnect.com/docs/v2/writing-algorithms/key-concepts/time-modeling/timeslices)  with the dataset  **Symbol**. Slice objects deliver unique events to your algorithm as they happen, but the  **Slice**  may not contain data for your dataset at every time step. To avoid issues, check if the  **Slice**  contains the data you want before you index it.
 
+Python:
+```py
+def  OnData(self, slice:  Slice)  ->  None:
+    if slice.ContainsKey(self.dataset_symbol):
+        data_point = slice[self.dataset_symbol]
+        self.Log(f"{self.dataset_symbol} mentions at {slice.Time}: {data_point.Mentions}")
+```
 C#:
 ```cs
 public  override  void  OnData(Slice slice)
@@ -140,14 +177,13 @@ public  override  void  OnData(Slice slice)
     }
 }
 ```
+To iterate through all of the dataset objects in the current **Slice**, call the **Get** method.
 Python:
 ```py
 def  OnData(self, slice:  Slice)  ->  None:
-    if slice.ContainsKey(self.dataset_symbol):
-        data_point = slice[self.dataset_symbol]
-        self.Log(f"{self.dataset_symbol} mentions at {slice.Time}: {data_point.Mentions}")
+    for dataset_symbol, data_point in slice.Get(QuiverWallStreetBets).items():
+        self.Log(f"{dataset_symbol} mentions at {slice.Time}: {data_point.Mentions}")
 ```
-To iterate through all of the dataset objects in the current **Slice**, call the **Get** method.
 C#:
 ```cs
 public  override  void  OnData(Slice slice)
@@ -160,21 +196,11 @@ public  override  void  OnData(Slice slice)
     }
 }
 ```
-Python:
-```py
-def  OnData(self, slice:  Slice)  ->  None:
-    for dataset_symbol, data_point in slice.Get(QuiverWallStreetBets).items():
-        self.Log(f"{dataset_symbol} mentions at {slice.Time}: {data_point.Mentions}")
-```
 
 ### Historical Data
 
 To get historical WallStreetBets data, call the **History** method with the dataset **Symbol**. If there is no data in the period you request, the history result is empty.
 
-C#:
-```cs
-var history =  History<QuiverWallStreetBets>(_datasetSymbol,  100,  Resolution.Daily);
-```
 Python:
 ```py
 # DataFrame
@@ -183,12 +209,25 @@ history_df = self.History(self.dataset_symbol,  100,  Resolution.Daily)
 # Dataset objects
 history_bars = self.History[QuiverWallStreetBets](self.dataset_symbol,  100,  Resolution.Daily)
 ```
+C#:
+```cs
+var history =  History<QuiverWallStreetBets>(_datasetSymbol,  100,  Resolution.Daily);
+```
 For more information about historical data, see [History Requests](https://www.quantconnect.com/docs/v2/writing-algorithms/historical-data/history-requests).
 
 ### Universe Selection
 
 To select a dynamic universe of US Equities based on WallStreetBets data, call the  **AddUniverse**  method with the  **QuiverWallStreetBetsUniverse**  class and a selection function.
 
+Python:
+```py
+def  Initialize(self)  ->  None:
+    self.AddUniverse(QuiverWallStreetBetsUniverse,  "QuiverWallStreetBetsUniverse",  Resolution.Daily, self.UniverseSelection)
+
+def  UniverseSelection(self, alt_coarse:  List[QuiverWallStreetBetsUniverse])  ->  List[Symbol]:
+    return  [d.Symbol  for d in alt_coarse
+         if d.Mentions  >  100 and d.Rank  <  100]
+```
 C#:
 ```cs
 public  override  void  Initialize()
@@ -202,15 +241,6 @@ public  override  void  Initialize()
         });
 }
 ```
-Python:
-```py
-def  Initialize(self)  ->  None:
-    self.AddUniverse(QuiverWallStreetBetsUniverse,  "QuiverWallStreetBetsUniverse",  Resolution.Daily, self.UniverseSelection)
-
-def  UniverseSelection(self, alt_coarse:  List[QuiverWallStreetBetsUniverse])  ->  List[Symbol]:
-    return  [d.Symbol  for d in alt_coarse
-         if d.Mentions  >  100 and d.Rank  <  100]
-```
 
 For more information about dynamic universes, see [Universes](https://www.quantconnect.com/docs/v2/writing-algorithms/universes/key-concepts).
 
@@ -218,13 +248,13 @@ For more information about dynamic universes, see [Universes](https://www.quantc
 
 To remove a subscription, call the  **RemoveSecurity**  method.
 
-C#:
-```cs
-RemoveSecurity(_datasetSymbol);
-```
 Python
 ```py
 self.RemoveSecurity(self.dataset_symbol)
+```
+C#:
+```cs
+RemoveSecurity(_datasetSymbol);
 ```
 
 If you subscribe to WallStreetBets data for assets in a dynamic universe, remove the dataset subscription when the asset leaves your universe. To view a common design pattern, see  [Track Security Changes](https://www.quantconnect.com/docs/v2/writing-algorithms/algorithm-framework/alpha/key-concepts#05-Track-Security-Changes).
@@ -235,45 +265,19 @@ If you subscribe to WallStreetBets data for assets in a dynamic universe, remove
 
 &nbsp;
 
-
-![LEAN Data Source SDK](http://cdn.quantconnect.com.s3.us-east-1.amazonaws.com/datasources/Github_LeanDataSourceSDK.png)
-
-# Lean DataSource SDK
+## Lean DataSource SDK
 [![Build Status](https://github.com/QuantConnect/LeanDataSdk/workflows/Build%20%26%20Test/badge.svg)](https://github.com/QuantConnect/LeanDataSdk/actions?query=workflow%3A%22Build%20%26%20Test%22)
 
-## Introduction
+### Introduction
 
 The Lean Data SDK is a cross-platform template repository for developing custom data types for Lean. These data types will be consumed by [QuantConnect](https://www.quantconnect.com/) trading algorithms and research environment, locally or in the cloud.
 
 It is composed by example .Net solution for the data type and converter scripts.
 
-## Implementing your own data source
+### Implementing your own data source
 
 To learn more about implementing your own data source for our marketplace, visit the QuantConnect Documentation on [Datasets](https://www.quantconnect.com/docs/v2/our-platform/datasets/) for more information.
- 
-&nbsp;
 
-&nbsp;
-
-&nbsp;
-
-![whats-lean](https://user-images.githubusercontent.com/79997186/184042682-2264a534-74f7-479e-9b88-72531661e35d.png)
-
-  
-
-&nbsp;
-
-&nbsp;
-
-&nbsp;
-
-  
-
-LEAN Engine is an open-source algorithmic trading engine built for easy strategy research, backtesting, and live trading. We integrate with common data providers and brokerages, so you can quickly deploy algorithmic trading strategies.
-
-  
-
-The core of the LEAN Engine is written in C#, but it operates seamlessly on Linux, Mac and Windows operating systems. To use it, you can write algorithms in Python 3.8 or C#. QuantConnect maintains the LEAN project and uses it to drive the web-based algorithmic trading platform on the website.
 
 ## Contributions
 
