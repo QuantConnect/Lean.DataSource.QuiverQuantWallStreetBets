@@ -15,26 +15,20 @@
 */
 
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using Newtonsoft.Json;
-using NodaTime;
-using QuantConnect;
 using QuantConnect.Data;
+using QuantConnect.Data.UniverseSelection;
+
 namespace QuantConnect.DataSource
 {
     /// <summary>
     /// Universe Selection helper class for QuiverWallStreetBets dataset
     /// </summary>
-    public class QuiverWallStreetBetsUniverse : BaseData
+    public class QuiverWallStreetBetsUniverse : BaseDataCollection
     {
         private static readonly TimeSpan _period = TimeSpan.FromDays(1);
-        
-        /// <summary>
-        /// Symbol of data
-        /// </summary>
-        public Symbol Symbol { get; set; }
 
         /// <summary>
         /// The number of mentions on the given date
@@ -78,7 +72,8 @@ namespace QuantConnect.DataSource
                     "universe",
                     $"{date.ToStringInvariant(DateFormat.EightCharacter)}.csv"
                 ),
-                SubscriptionTransportMedium.LocalFile
+                SubscriptionTransportMedium.LocalFile,
+                FileFormat.FoldingCollection
             );
         }
 
@@ -104,6 +99,24 @@ namespace QuantConnect.DataSource
                 Symbol = new Symbol(SecurityIdentifier.Parse(csv[0]), csv[1]),
                 Time = date,
                 Value = mentions
+            };
+        }
+
+        /// <summary>
+        /// Clones this instance
+        /// </summary>
+        public override BaseData Clone()
+        {
+            return new QuiverWallStreetBetsUniverse
+            {
+                Symbol = Symbol,
+                Time = Time,
+                Value = Value,
+                Data = Data,
+
+                Mentions = Mentions,
+                Rank = Rank,
+                Sentiment = Sentiment
             };
         }
     }

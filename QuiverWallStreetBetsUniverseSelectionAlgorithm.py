@@ -13,7 +13,7 @@
 
 from AlgorithmImports import *
 
-class QuiverWallStreetBetsUniverseAlgorithm(QCAlgorithm): 
+class QuiverWallStreetBetsUniverseAlgorithm(QCAlgorithm):
     def Initialize(self):
         # Data ADDED via universe selection is added with Daily resolution.
         self.UniverseSettings.Resolution = Resolution.Daily
@@ -23,8 +23,16 @@ class QuiverWallStreetBetsUniverseAlgorithm(QCAlgorithm):
         self.SetCash(100000)
 
         # add a custom universe data source (defaults to usa-equity)
-        self.AddUniverse(QuiverWallStreetBetsUniverse, "QuiverWallStreetBetsUniverse", Resolution.Daily, self.UniverseSelection)
-        
+        universe = self.AddUniverse(QuiverWallStreetBetsUniverse, self.UniverseSelection)
+
+        history = self.History(universe, TimeSpan(1, 0, 0, 0))
+        if len(history) != 1:
+            raise ValueError(f"Unexpected history count {len(history)}! Expected 1")
+
+        for dataForDate in history:
+            if len(dataForDate) < 100:
+                raise ValueError(f"Unexpected historical universe data!")
+
     def UniverseSelection(self, data):
         for datum in data:
             self.Log(f"{datum.Symbol},{datum.Mentions},{datum.Rank},{datum.Sentiment}")
