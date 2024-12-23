@@ -24,21 +24,19 @@ using NUnit.Framework;
 using QuantConnect.Data;
 using QuantConnect.DataSource;
 using QuantConnect.Data.Market;
+using QuantConnect.Data.Auxiliary;
+using QuantConnect.Interfaces;
+using QuantConnect.Util;
 
 namespace QuantConnect.DataLibrary.Tests
 {
     [TestFixture]
     public class QuiverWallStreetBetsUniverseTests
     {
-        [Test]
-        public void JsonRoundTrip()
+        [OneTimeSetUp]
+        public void Setup()
         {
-            var expected = CreateNewInstance();
-            var type = expected.GetType();
-            var serialized = JsonConvert.SerializeObject(expected);
-            var result = JsonConvert.DeserializeObject(serialized, type);
-
-            AssertAreEqual(expected, result);
+            Composer.Instance.GetExportedValueByTypeName<IMapFileProvider>(Configuration.Config.Get("map-file-provider", typeof(LocalDiskMapFileProvider).Name));
         }
 
         [Test]
